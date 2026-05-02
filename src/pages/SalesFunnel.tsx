@@ -36,7 +36,6 @@ export default function SalesFunnel() {
 
   async function moveDeal(id: string, newStage: string) {
     await supabase.from('sales_funnel').update({ stage: newStage }).eq('id', id);
-    // Optimistic UI update could be added here
   }
 
   const groupedDeals = STAGES.reduce((acc, stage) => {
@@ -47,16 +46,16 @@ export default function SalesFunnel() {
   return (
     <div className="h-full flex flex-col space-y-6">
       <div className="flex items-center justify-between shrink-0">
-        <h2 className="text-2xl font-bold text-white">Sales Funnel</h2>
+        <h2 className="text-2xl font-bold text-slate-900">Sales Funnel</h2>
       </div>
 
       <div className="flex-1 overflow-x-auto pb-4">
         <div className="flex space-x-6 min-w-max h-full">
           {STAGES.map((stage) => (
-            <div key={stage} className="w-80 flex flex-col h-full bg-slate-800/30 rounded-2xl border border-slate-700/50 p-4">
+            <div key={stage} className="w-80 flex flex-col h-full bg-slate-100/50 rounded-2xl border border-slate-200 p-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-300">{stage}</h3>
-                <span className="bg-slate-700 text-slate-300 text-xs py-1 px-2 rounded-full font-medium">
+                <h3 className="font-semibold text-slate-700">{stage}</h3>
+                <span className="bg-slate-200 text-slate-600 text-xs py-1 px-2 rounded-full font-medium">
                   {groupedDeals[stage]?.length || 0}
                 </span>
               </div>
@@ -65,29 +64,28 @@ export default function SalesFunnel() {
                 {groupedDeals[stage]?.map((deal) => (
                   <div 
                     key={deal.id} 
-                    className="bg-slate-800 border border-slate-600/50 rounded-xl p-4 cursor-grab hover:border-blue-500/50 transition-colors shadow-sm relative group"
+                    className="bg-white border border-slate-200 rounded-xl p-4 cursor-grab hover:border-sky-400 hover:shadow-md transition-all shadow-sm relative group"
                   >
                     <div className="flex items-start justify-between">
                       <div className="pr-6">
-                        <h4 className="text-sm font-medium text-white mb-1">{deal.title}</h4>
-                        <p className="text-lg font-bold text-emerald-400">${deal.value.toLocaleString()}</p>
+                        <h4 className="text-sm font-medium text-slate-900 mb-1">{deal.title}</h4>
+                        <p className="text-lg font-bold text-emerald-600">${deal.value.toLocaleString()}</p>
                       </div>
-                      <GripVertical className="w-4 h-4 text-slate-500 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <GripVertical className="w-4 h-4 text-slate-300 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                     
-                    {/* Simple buttons to move deal since we aren't using a heavy drag-n-drop library for the MVP */}
-                    <div className="flex justify-between mt-4 pt-3 border-t border-slate-700/50">
+                    <div className="flex justify-between mt-4 pt-3 border-t border-slate-100">
                       <button 
                         disabled={STAGES.indexOf(stage) === 0}
                         onClick={() => moveDeal(deal.id, STAGES[STAGES.indexOf(stage) - 1])}
-                        className="text-xs text-slate-400 hover:text-blue-400 disabled:opacity-30 transition-colors"
+                        className="text-xs font-medium text-slate-400 hover:text-sky-500 disabled:opacity-30 transition-colors"
                       >
                         ← Prev
                       </button>
                       <button 
                         disabled={STAGES.indexOf(stage) === STAGES.length - 1}
                         onClick={() => moveDeal(deal.id, STAGES[STAGES.indexOf(stage) + 1])}
-                        className="text-xs text-slate-400 hover:text-blue-400 disabled:opacity-30 transition-colors"
+                        className="text-xs font-medium text-slate-400 hover:text-sky-500 disabled:opacity-30 transition-colors"
                       >
                         Next →
                       </button>
@@ -95,7 +93,7 @@ export default function SalesFunnel() {
                   </div>
                 ))}
                 {groupedDeals[stage]?.length === 0 && (
-                  <div className="border-2 border-dashed border-slate-700/50 rounded-xl p-4 text-center text-sm text-slate-500">
+                  <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center text-sm text-slate-400 font-medium">
                     No deals
                   </div>
                 )}

@@ -1,27 +1,61 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Minus, Search, Edit2 } from 'lucide-react';
+import { Plus, Search, Loader2 } from 'lucide-react';
 
-interface Product {
+interface Movement {
   id: string;
-  sku: string;
-  name: string;
-  price: number;
-  cost: number;
-  stock: number;
+  fecha: string;
+  movimiento: string;
+  proyecto: string;
+  bodega: string;
+  tipo: string;
+  pieza: string;
+  modelo: string;
+  cantidad: number;
 }
 
+const BODEGAS = ['Bigbox', 'Blindados', 'Energisol', 'Oficina', 'Patio'];
+const MOVIMIENTOS = ['Entrada', 'Salida'];
+
+const CATEGORY_MAP: Record<string, Record<string, string[]>> = {
+  'Calentador': {
+    'Tanque': ['EN HEAT PIPE 20/1800', 'EN HP 150 15/1800', 'EN HP 200 20/1800'],
+    'Espejos': ['Heat Pipe'],
+    'Estructura': ['EN HEAT PIPE 20/1800', 'EN HP 15/1800', 'EN HP 20/1800'],
+    'Tubos': ['58/1800 EN HP', '58/1800 HEAT PIPE', '47/1500', '58/1800']
+  },
+  'Luminarias': {
+    'Luminaria': ['X4DN25'],
+    'poste': ['SENCILLO - 6 MTS', 'DOBLE - 6 MTS', 'SENCILLO - 8 MTS']
+  }
+};
+
 export default function Inventory() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Form State
+  const [movimiento, setMovimiento] = useState(MOVIMIENTOS[0]);
+  const [bodega, setBodega] = useState(BODEGAS[0]);
+  const [proyecto, setProyecto] = useState('');
+  const [tipo, setTipo] = useState('');
+  const [pieza, setPieza] = useState('');
+  const [modelo, setModelo] = useState('');
+  const [cantidad, setCantidad] = useState(1);
+
+  // Derived Dropdown Options
+  const tipos = Object.keys(CATEGORY_MAP);
+  const piezas = tipo ? Object.keys(CATEGORY_MAP[tipo] || {}) : [];
+  const modelos = pieza && tipo ? CATEGORY_MAP[tipo][pieza] || [] : [];
 
   useEffect(() => {
-    fetchProducts();
+    fetchMovements();
 
     const channel = supabase
       .channel('inventory_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        fetchProducts();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_movements' }, () => {
+        fetchMovements();
       })
       .subscribe();
 
@@ -30,96 +64,222 @@ export default function Inventory() {
     };
   }, []);
 
-  async function fetchProducts() {
-    const { data } = await supabase.from('inventory').select('*').order('name');
-    if (data) setProducts(data);
+  async function fetchMovements() {
+    const { data } = await supabase.from('inventory_movements').select('*').order('created_at', { ascending: false });
+    if (data) setMovements(data as Movement[]);
   }
 
-  async function updateStock(id: string, currentStock: number, delta: number) {
-    const newStock = Math.max(0, currentStock + delta);
-    await supabase.from('inventory').update({ stock: newStock }).eq('id', id);
+  // Handle cascading clears
+  useEffect(() => {
+    setPieza('');
+    setModelo('');
+  }, [tipo]);
+
+  useEffect(() => {
+    setModelo('');
+  }, [pieza]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tipo || !pieza || !modelo || !cantidad) return;
+    setLoading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user authenticated");
+
+      const { error } = await supabase.from('inventory_movements').insert([
+        {
+          movimiento,
+          bodega,
+          proyecto: proyecto || null,
+          tipo,
+          pieza,
+          modelo,
+          cantidad,
+          autorizador: user.id
+        }
+      ]);
+
+      if (error) throw error;
+      
+      // Reset Form
+      setProyecto('');
+      setTipo('');
+      setPieza('');
+      setModelo('');
+      setCantidad(1);
+    } catch (err) {
+      console.error(err);
+      alert('Error creating record');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase()) || 
-    p.sku.toLowerCase().includes(search.toLowerCase())
+  const filteredMovements = movements.filter(m => 
+    m.modelo.toLowerCase().includes(search.toLowerCase()) || 
+    m.proyecto?.toLowerCase().includes(search.toLowerCase()) ||
+    m.bodega.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-white">Inventory Management</h2>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-slate-500" />
+    <div className="flex flex-col lg:flex-row gap-6">
+      
+      {/* Left Column: Reporting Table */}
+      <div className="flex-1 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h2 className="text-2xl font-bold text-slate-900">Inventory Reporting</h2>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-slate-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search records..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="block w-full sm:w-64 pl-10 pr-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm"
+            />
           </div>
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="block w-full sm:w-64 pl-10 pr-3 py-2 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
-          />
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="p-4">Date</th>
+                  <th className="p-4">Movement</th>
+                  <th className="p-4">Warehouse</th>
+                  <th className="p-4">Project</th>
+                  <th className="p-4">Model</th>
+                  <th className="p-4">Qty</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredMovements.map((record) => (
+                  <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 text-sm text-slate-600">{new Date(record.fecha).toLocaleDateString()}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${record.movimiento === 'Entrada' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                        {record.movimiento}
+                      </span>
+                    </td>
+                    <td className="p-4 text-sm text-slate-700 font-medium">{record.bodega}</td>
+                    <td className="p-4 text-sm text-slate-500">{record.proyecto || '-'}</td>
+                    <td className="p-4 text-sm text-slate-900">
+                      <div className="font-medium">{record.modelo}</div>
+                      <div className="text-xs text-slate-500">{record.tipo} - {record.pieza}</div>
+                    </td>
+                    <td className="p-4 text-sm font-bold text-slate-700">{record.cantidad}</td>
+                  </tr>
+                ))}
+                {filteredMovements.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                      No records found. Create one using the form.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl overflow-hidden shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-800/80 border-b border-slate-700/50 text-xs uppercase tracking-wider text-slate-400">
-                <th className="p-4 font-medium">SKU</th>
-                <th className="p-4 font-medium">Product Name</th>
-                <th className="p-4 font-medium">Price</th>
-                <th className="p-4 font-medium">Cost</th>
-                <th className="p-4 font-medium text-center">Stock</th>
-                <th className="p-4 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-slate-700/20 transition-colors">
-                  <td className="p-4 text-sm font-mono text-slate-400">{product.sku}</td>
-                  <td className="p-4 text-sm font-medium text-white">{product.name}</td>
-                  <td className="p-4 text-sm text-emerald-400">${product.price.toLocaleString()}</td>
-                  <td className="p-4 text-sm text-slate-400">${product.cost.toLocaleString()}</td>
-                  <td className="p-4">
-                    <div className="flex items-center justify-center space-x-3">
-                      <button 
-                        onClick={() => updateStock(product.id, product.stock, -1)}
-                        className="p-1 rounded-md hover:bg-slate-700 text-slate-400 hover:text-red-400 transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className={`text-sm font-bold w-8 text-center ${product.stock <= 5 ? 'text-red-400' : 'text-white'}`}>
-                        {product.stock}
-                      </span>
-                      <button 
-                        onClick={() => updateStock(product.id, product.stock, 1)}
-                        className="p-1 rounded-md hover:bg-slate-700 text-slate-400 hover:text-emerald-400 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="p-4 text-right">
-                    <button className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors inline-flex items-center justify-center">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredProducts.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400">
-                    No products found. Add some data directly in Supabase or expand the app to include a creation form.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {/* Right Column: Form Side Panel */}
+      <div className="w-full lg:w-80 shrink-0">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm sticky top-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-slate-900">New Record</h3>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Movement</label>
+              <select 
+                value={movimiento} onChange={e => setMovimiento(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              >
+                {MOVIMIENTOS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Warehouse</label>
+              <select 
+                value={bodega} onChange={e => setBodega(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              >
+                {BODEGAS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Project</label>
+              <input 
+                type="text" value={proyecto} onChange={e => setProyecto(e.target.value)}
+                placeholder="Optional"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
+
+            <hr className="border-slate-100" />
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Type</label>
+              <select 
+                value={tipo} onChange={e => setTipo(e.target.value)} required
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              >
+                <option value="">Select Type</option>
+                {tipos.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Part</label>
+              <select 
+                value={pieza} onChange={e => setPieza(e.target.value)} required disabled={!tipo}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Select Part</option>
+                {piezas.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Model</label>
+              <select 
+                value={modelo} onChange={e => setModelo(e.target.value)} required disabled={!pieza}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Select Model</option>
+                {modelos.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Quantity</label>
+              <input 
+                type="number" min="1" value={cantidad} onChange={e => setCantidad(parseInt(e.target.value))} required
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || !modelo}
+              className="w-full flex justify-center items-center py-3 px-4 rounded-xl text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 transition-colors disabled:opacity-50 mt-6"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Save Record
+            </button>
+          </form>
         </div>
       </div>
+      
     </div>
   );
 }

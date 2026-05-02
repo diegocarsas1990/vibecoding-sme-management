@@ -31,29 +31,29 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-slate-800/50 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-700/50 p-8">
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-4 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-              <Rocket className="w-8 h-8 text-blue-400" />
+            <div className="w-16 h-16 bg-sky-50 rounded-2xl flex items-center justify-center mb-4 border border-sky-100">
+              <Rocket className="w-8 h-8 text-sky-500" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
-            <p className="text-slate-400 text-sm">Sign in to manage your business</p>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">Welcome Back</h1>
+            <p className="text-slate-500 text-sm">Sign in to manage your business</p>
           </div>
 
           <form onSubmit={handleAuth} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-500" />
+                  <Mail className="h-5 w-5 text-slate-400" />
                 </div>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-slate-700 rounded-xl bg-slate-900/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 sm:text-sm transition-all"
+                  className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition-all"
                   placeholder="you@example.com"
                   required
                 />
@@ -61,16 +61,16 @@ export default function Auth() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-500" />
+                  <Lock className="h-5 w-5 text-slate-400" />
                 </div>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-slate-700 rounded-xl bg-slate-900/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 sm:text-sm transition-all"
+                  className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent sm:text-sm transition-all"
                   placeholder="••••••••"
                   required
                 />
@@ -78,7 +78,7 @@ export default function Auth() {
             </div>
 
             {message && (
-              <div className={`p-3 rounded-lg text-sm ${message.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+              <div className={`p-3 rounded-lg text-sm ${message.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
                 {message.text}
               </div>
             )}
@@ -86,7 +86,7 @@ export default function Auth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-sky-500 hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isSignUp ? 'Create Account' : 'Sign In')}
             </button>
@@ -95,7 +95,7 @@ export default function Auth() {
           <div className="mt-6 text-center">
             <button
               onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+              className="text-sm text-sky-600 hover:text-sky-500 font-medium transition-colors"
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
