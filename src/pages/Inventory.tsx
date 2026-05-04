@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, Loader2 } from 'lucide-react';
+import { Plus, Search, Loader2, Edit2, X, Save } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface Movement {
   id: string;
@@ -34,8 +35,10 @@ export default function Inventory() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form State
+  const [fecha, setFecha] = useState(() => new Date().toISOString().split('T')[0]);
   const [movimiento, setMovimiento] = useState(MOVIMIENTOS[0]);
   const [bodega, setBodega] = useState(BODEGAS[0]);
   const [proyecto, setProyecto] = useState('');
@@ -65,53 +68,85 @@ export default function Inventory() {
   }, []);
 
   async function fetchMovements() {
-    const { data } = await supabase.from('inventory_movements').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('inventory_movements').select('*').order('fecha', { ascending: false }).order('created_at', { ascending: false });
     if (data) setMovements(data as Movement[]);
   }
 
-  // Handle cascading clears
+  // Handle cascading clears when NOT editing
   useEffect(() => {
-    setPieza('');
-    setModelo('');
-  }, [tipo]);
+    if (!editingId) {
+      setPieza('');
+      setModelo('');
+    }
+  }, [tipo, editingId]);
 
   useEffect(() => {
+    if (!editingId) {
+      setModelo('');
+    }
+  }, [pieza, editingId]);
+
+  function handleEditClick(record: Movement) {
+    setEditingId(record.id);
+    setFecha(record.fecha);
+    setMovimiento(record.movimiento);
+    setBodega(record.bodega);
+    setProyecto(record.proyecto || '');
+    setTipo(record.tipo);
+    setPieza(record.pieza);
+    setModelo(record.modelo);
+    setCantidad(record.cantidad);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setFecha(new Date().toISOString().split('T')[0]);
+    setMovimiento(MOVIMIENTOS[0]);
+    setBodega(BODEGAS[0]);
+    setProyecto('');
+    setTipo('');
+    setPieza('');
     setModelo('');
-  }, [pieza]);
+    setCantidad(1);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!tipo || !pieza || !modelo || !cantidad) return;
+    if (!fecha || !tipo || !pieza || !modelo || !cantidad) return;
     setLoading(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user authenticated");
 
-      const { error } = await supabase.from('inventory_movements').insert([
-        {
-          movimiento,
-          bodega,
-          proyecto: proyecto || null,
-          tipo,
-          pieza,
-          modelo,
-          cantidad,
-          autorizador: user.id
-        }
-      ]);
+      const payload = {
+        fecha,
+        movimiento,
+        bodega,
+        proyecto: proyecto || null,
+        tipo,
+        pieza,
+        modelo,
+        cantidad,
+        autorizador: user.id
+      };
 
-      if (error) throw error;
+      if (editingId) {
+        const { error } = await supabase.from('inventory_movements').update(payload).eq('id', editingId);
+        if (error) throw error;
+        toast.success('Record updated successfully');
+        cancelEdit();
+      } else {
+        const { error } = await supabase.from('inventory_movements').insert([payload]);
+        if (error) throw error;
+        toast.success('Record created successfully');
+        cancelEdit(); // Clears form
+      }
       
-      // Reset Form
-      setProyecto('');
-      setTipo('');
-      setPieza('');
-      setModelo('');
-      setCantidad(1);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Error creating record');
+      toast.error(err.message || 'Error saving record');
     } finally {
       setLoading(false);
     }
@@ -155,12 +190,13 @@ export default function Inventory() {
                   <th className="p-4">Project</th>
                   <th className="p-4">Model</th>
                   <th className="p-4">Qty</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredMovements.map((record) => (
-                  <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 text-sm text-slate-600">{new Date(record.fecha).toLocaleDateString()}</td>
+                  <tr key={record.id} className={`hover:bg-slate-50 transition-colors ${editingId === record.id ? 'bg-sky-50' : ''}`}>
+                    <td className="p-4 text-sm text-slate-600">{record.fecha}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium border ${record.movimiento === 'Entrada' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
                         {record.movimiento}
@@ -173,12 +209,21 @@ export default function Inventory() {
                       <div className="text-xs text-slate-500">{record.tipo} - {record.pieza}</div>
                     </td>
                     <td className="p-4 text-sm font-bold text-slate-700">{record.cantidad}</td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => handleEditClick(record)}
+                        className="p-2 text-slate-400 hover:text-sky-500 hover:bg-sky-50 rounded-lg transition-colors"
+                        title="Edit Record"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {filteredMovements.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
-                      No records found. Create one using the form.
+                    <td colSpan={7} className="p-8 text-center text-slate-500">
+                      No records found.
                     </td>
                   </tr>
                 )}
@@ -190,30 +235,47 @@ export default function Inventory() {
 
       {/* Right Column: Form Side Panel */}
       <div className="w-full lg:w-80 shrink-0">
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm sticky top-6">
+        <div className={`border rounded-2xl p-6 shadow-sm sticky top-6 transition-colors ${editingId ? 'bg-sky-50 border-sky-200' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-slate-900">New Record</h3>
+            <h3 className={`text-lg font-bold ${editingId ? 'text-sky-900' : 'text-slate-900'}`}>
+              {editingId ? 'Edit Record' : 'New Record'}
+            </h3>
+            {editingId && (
+              <button onClick={cancelEdit} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Movement</label>
-              <select 
-                value={movimiento} onChange={e => setMovimiento(e.target.value)}
+              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Date</label>
+              <input 
+                type="date" value={fecha} onChange={e => setFecha(e.target.value)} required
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-              >
-                {MOVIMIENTOS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+              />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Warehouse</label>
-              <select 
-                value={bodega} onChange={e => setBodega(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-              >
-                {BODEGAS.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Movement</label>
+                <select 
+                  value={movimiento} onChange={e => setMovimiento(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                >
+                  {MOVIMIENTOS.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Warehouse</label>
+                <select 
+                  value={bodega} onChange={e => setBodega(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                >
+                  {BODEGAS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
             </div>
 
             <div>
@@ -225,7 +287,7 @@ export default function Inventory() {
               />
             </div>
 
-            <hr className="border-slate-100" />
+            <hr className={`${editingId ? 'border-sky-200' : 'border-slate-100'}`} />
 
             <div>
               <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Type</label>
@@ -271,10 +333,16 @@ export default function Inventory() {
             <button
               type="submit"
               disabled={loading || !modelo}
-              className="w-full flex justify-center items-center py-3 px-4 rounded-xl text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 transition-colors disabled:opacity-50 mt-6"
+              className={`w-full flex justify-center items-center py-3 px-4 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 mt-6 ${editingId ? 'bg-sky-600 hover:bg-sky-700' : 'bg-slate-900 hover:bg-slate-800'}`}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-              Save Record
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : editingId ? (
+                <Save className="w-4 h-4 mr-2" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
+              {editingId ? 'Save Changes' : 'Save Record'}
             </button>
           </form>
         </div>

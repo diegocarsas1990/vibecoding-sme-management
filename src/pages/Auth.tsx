@@ -1,30 +1,30 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Lock, Loader2, Rocket } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
-  const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage(null);
 
     try {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setMessage({ type: 'success', text: 'Check your email for the confirmation link!' });
+        toast.success('Check your email for the confirmation link!');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        toast.success('Signed in successfully!');
       }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'An error occurred' });
+      toast.error(error.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -76,12 +76,6 @@ export default function Auth() {
                 />
               </div>
             </div>
-
-            {message && (
-              <div className={`p-3 rounded-lg text-sm ${message.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                {message.text}
-              </div>
-            )}
 
             <button
               type="submit"
